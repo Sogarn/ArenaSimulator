@@ -10,6 +10,8 @@ namespace ArenaSimulator
     {
         static void Main(string[] args)
         {
+            Unit redTeam = new Unit("Slammer");
+            Console.ReadLine();
         }
     }
 }
