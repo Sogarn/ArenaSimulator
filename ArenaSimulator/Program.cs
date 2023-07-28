@@ -12,6 +12,8 @@ namespace ArenaSimulator
         {
             Unit redTeam = new Unit("Slammer");
             Console.ReadLine();
+
+            // TODO we can make lists of all active and passive skills for units to reference
         }
     }
 }

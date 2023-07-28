@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-
+// TODO probably need to add variables for debuffs like Unit.Poison bool and its severity
 namespace ArenaSimulator
 {
     // Base unit class
@@ -11,7 +11,7 @@ namespace ArenaSimulator
     {
         // Decided for stats to go negative for combat mechanics and deleveling purposes
         protected Random RNG;
-        public string Name { get; set; }
+        public string Name { get; private set; }
         // Level will start at 0
         protected int Level { get; private set; }
         protected int XPPerLevel { get; private set; }
@@ -20,6 +20,7 @@ namespace ArenaSimulator
         protected Skill[] ActiveSkills = new Skill[5];
         // Array of passive skills (5 slots)
         protected Skill[] PassiveSkills = new Skill[5];
+        // TODO add buffs and debuffs
         // Our 8 stats are HP, Strength, Defense, Magic, Resistance, Speed, Skill, and Luck
         // Base stats start at 10 and increase on level up
         protected int BaseHP { get; private set; }
@@ -225,5 +226,7 @@ namespace ArenaSimulator
             Console.WriteLine("HP: {0}\nStrength: {1}\nDefense {2}\nMagic: : {3}\nResistance: {4}\nSpeed: {5}\nSkill: {6}\nLuck: {7}\n",
                 BaseHP, BaseStrength, BaseDefense, BaseMagic, BaseResistance, BaseSpeed, BaseSkill, BaseLuck);
         }
+        
+        // TODO add "take damage" (check passives for on-damage-taken as a step) and "deal damage" (check passives for damage-dealt as a step)
     }
 }
