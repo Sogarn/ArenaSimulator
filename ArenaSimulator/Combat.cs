@@ -8,5 +8,6 @@ namespace ArenaSimulator
 {
     class Combat
     {
+        // TODO literally everything
     }
 }

@@ -16,10 +16,18 @@ namespace ArenaSimulator
         protected int Level { get; private set; }
         protected int XPPerLevel { get; private set; }
         protected int XPToNextLevel { get; private set; }
-        // Array of active skills (5 slots)
-        protected Skill[] ActiveSkills = new Skill[5];
-        // Array of passive skills (5 slots)
-        protected Skill[] PassiveSkills = new Skill[5];
+        // Max active skill count starts at 2 and increases with level
+        protected int MaxActiveSkills = 2;
+        // List of active skills
+        protected List<ActiveSkill> ActiveSkillsLearned = new List<ActiveSkill>();
+        // List of unlearned active skills
+        protected List<string> ActiveSkillsAvailable = Enum.GetNames(typeof(ActiveSkills)).ToList();
+        // Max passive skill count starts at 1 and increases with level
+        protected int MaxPassiveSkills = 1;
+        // List of passive skills
+        protected List<PassiveSkill> PassiveSkillsLearned = new List<PassiveSkill>();
+        // List of unlearned passive skills
+        protected List<string> PassiveSkillsAvailable = Enum.GetNames(typeof(PassiveSkills)).ToList();
         // TODO add buffs and debuffs
         // Our 8 stats are HP, Strength, Defense, Magic, Resistance, Speed, Skill, and Luck
         // Base stats start at 10 and increase on level up
@@ -64,6 +72,9 @@ namespace ArenaSimulator
             InitializeGrowths();
             // Level up once
             LevelUp();
+            // Get basic autoattacks
+            AddActiveSkill(ActiveSkills.BasicMelee);
+            AddActiveSkill(ActiveSkills.BasicMagic);
         }
 
         // In case we want custom base stats later
@@ -106,6 +117,15 @@ namespace ArenaSimulator
             Speed = BaseSpeed;
             Skill = BaseSkill;
             Luck = BaseLuck;
+            // Reset all skill cooldowns
+            foreach(ActiveSkill skill in ActiveSkillsLearned)
+            {
+                skill.ResetCooldown();
+            }
+            foreach (PassiveSkill skill in PassiveSkillsLearned)
+            {
+                skill.ResetCooldown();
+            }
         }
 
         // Gain XP
@@ -125,9 +145,11 @@ namespace ArenaSimulator
         {
             Console.WriteLine("Leveled up! Level {0} -> {1}", Level, Level + 1);
             Level += 1;
+
             // Add 1 to base stat if we rolled equal to or below the growth stat
             // If we did not gain a stat, roll luck for bad luck protection
             #region Stat growth RNG
+            // If LevelUpLuckRoll has any length then luck roll passed
             if (GetRNG() <= GrowthHP)
             {
                 Console.WriteLine("Gained HP! {0} -> {1}", BaseHP, BaseHP + 1);
@@ -226,7 +248,53 @@ namespace ArenaSimulator
             Console.WriteLine("HP: {0}\nStrength: {1}\nDefense {2}\nMagic: : {3}\nResistance: {4}\nSpeed: {5}\nSkill: {6}\nLuck: {7}\n",
                 BaseHP, BaseStrength, BaseDefense, BaseMagic, BaseResistance, BaseSpeed, BaseSkill, BaseLuck);
         }
-        
-        // TODO add "take damage" (check passives for on-damage-taken as a step) and "deal damage" (check passives for damage-dealt as a step)
+
+        // Add new active skill to list
+        protected void AddActiveSkill(ActiveSkills skill)
+        {
+            // Check that we have space
+            // Also TODO if we already have too many skills overwrite one the same way but add the overwrited one to ActiveSkillsAvailable
+            if (ActiveSkillsLearned.Count <= MaxActiveSkills)
+            {
+                ActiveSkillsLearned.Add(new ActiveSkill(skill));
+                // Update available skill list
+                ActiveSkillsAvailable.Remove(Enum.GetName(typeof(ActiveSkills), skill));
+            }
+        }
+
+        // Add new passive skill to list
+        protected void AddPassiveSkill(PassiveSkills skill)
+        {
+            // Check that we have space
+            // Also TODO if we already have too many skills overwrite one the same way but add the overwrited one to PassiveSkillsAvailable
+            if (PassiveSkillsLearned.Count <= MaxPassiveSkills) 
+            {
+                PassiveSkillsLearned.Add(new PassiveSkill(skill));
+                // Update available skill list
+                PassiveSkillsAvailable.Remove(Enum.GetName(typeof(PassiveSkills), skill));
+            }
+        }
+
+        // Get new active skill
+        protected void LearnRandomActiveSkill()
+        {
+            // Find a random available skill
+            string randomSkill = ActiveSkillsAvailable.ElementAt(RNG.Next(0, ActiveSkillsAvailable.Count));
+            // Save it as enum
+            Enum.TryParse(randomSkill, out ActiveSkills active);
+            AddActiveSkill(active);
+        }
+
+        // Get new passive skill
+        protected void LearnRandomPassiveSkill()
+        {
+            // Find a random available skill
+            string randomSkill = PassiveSkillsAvailable.ElementAt(RNG.Next(0, PassiveSkillsAvailable.Count));
+            // Save it as enum
+            Enum.TryParse(randomSkill, out PassiveSkills passive);
+            AddPassiveSkill(passive);
+        }
+        // TODO add "recieve damage" (check passives for on-damage-taken as a step) and "deal damage" (check passives for damage-dealt as a step)
+        // and "try attack" vs "recieve attack" for when attacking or attacked
     }
 }
