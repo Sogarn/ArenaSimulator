@@ -21,7 +21,7 @@ namespace ArenaSimulator
         BoostStrength, // Boost strength on attack
         ProtectAll, // Chance to block damage
         BoostMagic, // Boost magic on attack
-        Recklessness, // Boost all stats in exchange for health
+        Sacrifice, // Boost all stats in exchange for health
     }
 
     // Skills will be options useable in combat
@@ -34,9 +34,9 @@ namespace ArenaSimulator
         protected int Cooldown { get; set; }
         protected int RemainingCooldown { get; set; }
         // Physical damage type
-        protected bool Physical { get; set; }
+        public bool Physical { get; protected set; }
         // Magical damage type
-        protected bool Magical { get; set; }
+        public bool Magical { get; protected set; }
 
         // Check cooldown
         public bool SkillReady()
@@ -44,9 +44,10 @@ namespace ArenaSimulator
             return (RemainingCooldown == 0);
         }
 
-        // Use skill
-        public void UseSkill()
+        // Use skill (plus some logging)
+        public void UseSkill(string unitName)
         {
+            Console.WriteLine("{0} activates {1}!", unitName, Name);
             RemainingCooldown = Cooldown;
         }
 
@@ -77,9 +78,9 @@ namespace ArenaSimulator
     class ActiveSkill : Skill
     {
         // Internal skill name
-        protected ActiveSkills InternalName { get; set; }
+        public ActiveSkills InternalName { get; protected set; }
         // Damage it deals
-        protected int BaseDamage { get; set; }
+        public int BaseDamage { get; protected set; }
 
         // Will have custom constructor for every ID enum above
         public ActiveSkill(ActiveSkills skill)
@@ -136,11 +137,13 @@ namespace ArenaSimulator
     class PassiveSkill : Skill
     {
         // Internal skill name
-        protected PassiveSkills InternalName { get; set; }
+        public PassiveSkills InternalName { get; protected set; }
         // Offensive triggers on attacking, defensive is on getting attacked
         // Could add triggers for attack roll vs damage roll but currently all are on attack
-        protected bool Offensive { get; set; }
-        protected bool Defensive { get; set; }
+        public bool Offensive { get; protected set; }
+        public bool Defensive { get; protected set; }
+        // How this proc scales with skill (1 = 100% of skill stat)
+        public float SkillCoefficient { get; protected set; }
         // Number of turns it lasts (TODO TBH this is going to probably be implemented with buffs / debuffs rather than here)
         protected int Duration { get; set; }
         protected int RemainingDuration { get; set; }
@@ -156,6 +159,7 @@ namespace ArenaSimulator
                     Name = "Bolster";
                     Cooldown = 0;
                     Offensive = true;
+                    SkillCoefficient = 1f;
                     Physical = true;
                     Magical = false;
                     break;
@@ -165,6 +169,7 @@ namespace ArenaSimulator
                     Name = "Study";
                     Cooldown = 0;
                     Offensive = true;
+                    SkillCoefficient = 1f;
                     Physical = true;
                     Magical = false;
                     break;
@@ -174,15 +179,17 @@ namespace ArenaSimulator
                     Name = "Deflect";
                     Cooldown = 1;
                     Offensive = false;
+                    SkillCoefficient = 0.5f;
                     Physical = true;
                     Magical = true;
                     break;
                 // Recklessness boosts all stats at the cost of health
-                case PassiveSkills.Recklessness:
-                    InternalName = PassiveSkills.Recklessness;
-                    Name = "Recklessness";
+                case PassiveSkills.Sacrifice:
+                    InternalName = PassiveSkills.Sacrifice;
+                    Name = "Dark Pact";
                     Cooldown = 0;
-                    Offensive = false;
+                    Offensive = true;
+                    SkillCoefficient = 0.5f;
                     Physical = true;
                     Magical = true;
                     break;
