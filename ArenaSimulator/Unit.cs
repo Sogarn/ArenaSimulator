@@ -9,8 +9,8 @@ namespace ArenaSimulator
     // Base unit class
     class Unit
     {
-        // Decided for stats to go negative for combat mechanics and deleveling purposes
-        protected Random RNG;
+        // All units share the same RNG object
+        protected static readonly Random RNG = new Random();
         public string Name { get; protected set; }
         // Level will start at 0
         protected int Level { get; set; }
@@ -61,7 +61,6 @@ namespace ArenaSimulator
         public Unit(string name)
         {
             Name = name;
-            RNG = new Random();
             Level = 0;
             XPPerLevel = 250;
             XPToNextLevel = XPPerLevel;
@@ -81,8 +80,8 @@ namespace ArenaSimulator
         // In case we want custom base stats later
         protected virtual void InitializeBaseStats(int defaultStat = 10)
         {
-            // Fill with default stats
-            BaseHP = defaultStat;
+            // Fill with default stats, HP starts doubled
+            BaseHP = defaultStat * 2;
             BaseStrength = defaultStat;
             BaseDefense = defaultStat;
             BaseMagic = defaultStat;
@@ -96,13 +95,48 @@ namespace ArenaSimulator
         protected virtual void InitializeGrowths(int defaultGrowth = 10)
         {
             // Fill with default growths (messing around with random scaling for testing)
-            GrowthHP = defaultGrowth * RNG.Next(1,10);
-            GrowthStrength = defaultGrowth * RNG.Next(1, 10);
-            GrowthDefense = defaultGrowth * RNG.Next(1, 10);
-            GrowthMagic = defaultGrowth * RNG.Next(1, 10);
-            GrowthResistance = defaultGrowth * RNG.Next(1, 10);
-            GrowthSpeed = defaultGrowth * RNG.Next(1, 10);
-            GrowthSkill = defaultGrowth * RNG.Next(1, 10);
+            // Initial rolls are between 1x and 9x
+            // Bad luck protection (every time RNG.Next rolls below 3 its minimum goes up by 1 until it reaches 3)
+            int currentMin = 1;
+            // Good luck punishment (every time RNG.Next rolls 7+ its maximum goes down by 1 until it reaches 7)
+            int currentMax = 10;
+            // Final multipliers
+            int[] statMultiplier = new int [8];
+            // Multpliers that we will pull from
+            List<int> jumbledMultiplier = new List<int>();
+            for (int i = 0; i < 8; i++)
+            {
+                // Give roll to list
+                jumbledMultiplier.Add(RNG.Next(currentMin, currentMax));
+                // We will automatically stop adding to the minimum when it is 3 and subtracting from max when it is 8 (7 inclusive)
+                if (jumbledMultiplier[i] < 3)
+                {
+                    currentMin += 1;
+                }
+                else if (jumbledMultiplier[i] > 8)
+                {
+                    currentMax -= 1;
+                }
+            }
+            // Pull randomly from multipliers to fill stat multiplier list
+            int nextIndex;
+            for (int i = 0; i < statMultiplier.Length; i++)
+            {
+                // Get random eligible index
+                nextIndex = RNG.Next(0, jumbledMultiplier.Count);
+                // Add index to stat multiplier
+                statMultiplier[i] = jumbledMultiplier[nextIndex];
+                // Remove eligible index
+                jumbledMultiplier.Remove(nextIndex);
+            }
+            // Apply multipliers
+            GrowthHP = defaultGrowth * statMultiplier[0];
+            GrowthStrength = defaultGrowth * statMultiplier[1];
+            GrowthDefense = defaultGrowth * statMultiplier[2];
+            GrowthMagic = defaultGrowth * statMultiplier[3];
+            GrowthResistance = defaultGrowth * statMultiplier[4];
+            GrowthSpeed = defaultGrowth * statMultiplier[5];
+            GrowthSkill = defaultGrowth * statMultiplier[0];
             GrowthLuck = defaultGrowth * RNG.Next(1, 10);
         }
 
@@ -146,19 +180,19 @@ namespace ArenaSimulator
         {
             Console.WriteLine("{0} leveled up! Level {1} -> {2}", Name, Level, Level + 1);
             Level += 1;
-            // If our level is divisible by 4 then gain an active and passive skill slot
-            if (Level % 4 == 0)
+            // If our level is divisible by 5 then gain an active and passive skill slot
+            if (Level % 5 == 0)
             {
                 MaxActiveSkills += 1;
                 MaxPassiveSkills += 1;
             }
-            // If our level is divisible by 2 then learn a random active skill
-            if (Level % 2 == 0)
+            // If our level is divisible by 3 then learn a random active skill
+            if (Level % 3 == 0)
             {
                 LearnRandomActiveSkill();
             }
-            // If our level is divisible by 3 then learn a random passive skill
-            if (Level % 3 == 0)
+            // If our level is divisible by 4 then learn a random passive skill
+            if (Level % 4 == 0)
             {
                 LearnRandomPassiveSkill();
             }
@@ -166,19 +200,21 @@ namespace ArenaSimulator
             // Add 1 to base stat if we rolled equal to or below the growth stat
             // If we did not gain a stat, roll luck for bad luck protection
             #region Stat growth RNG
+            // HP growths are 2x
             if (GetRNG() <= GrowthHP)
             {
-                Console.WriteLine("Gained HP! {0} -> {1}", BaseHP, BaseHP + 1);
-                BaseHP += 1;
+                Console.WriteLine("Gained HP ({0}%)! {1} -> {2}", GrowthHP, BaseHP, BaseHP + 2);
+                BaseHP += 2;
             }
             else if (GetRNG() <= Luck)
             {
-                Console.WriteLine("Lucky! HP {0} -> {1}", BaseHP, BaseHP + 1);
-                BaseHP += 1;
+                Console.WriteLine("Lucky! HP {0} -> {1}", BaseHP, BaseHP + 2);
+                BaseHP += 2;
             }
+            // Other growths are 1x
             if (GetRNG() <= GrowthStrength)
             {
-                Console.WriteLine("Gained Strength! {0} -> {1}", BaseStrength, BaseStrength + 1);
+                Console.WriteLine("Gained Strength ({0}%)! {1} -> {2}", GrowthStrength, BaseStrength, BaseStrength + 1);
                 BaseStrength += 1;
             }
             else if (GetRNG() <= Luck)
@@ -188,7 +224,7 @@ namespace ArenaSimulator
             }
             if (GetRNG() <= GrowthDefense)
             {
-                Console.WriteLine("Gained Defense! {0} -> {1}", BaseDefense, BaseDefense + 1);
+                Console.WriteLine("Gained Defense ({0}%)! {1} -> {2}", GrowthDefense, BaseDefense, BaseDefense + 1);
                 BaseDefense += 1;
             }
             else if (GetRNG() <= Luck)
@@ -198,7 +234,7 @@ namespace ArenaSimulator
             }
             if (GetRNG() <= GrowthMagic)
             {
-                Console.WriteLine("Gained Magic! {0} -> {1}", BaseMagic, BaseMagic + 1);
+                Console.WriteLine("Gained Magic ({0}%)! {1} -> {2}", GrowthMagic, BaseMagic, BaseMagic + 1);
                 BaseMagic += 1;
             }
             else if (GetRNG() <= Luck)
@@ -208,7 +244,7 @@ namespace ArenaSimulator
             }
             if (GetRNG() <= GrowthResistance)
             {
-                Console.WriteLine("Gained Resistance! {0} -> {1}", BaseResistance, BaseResistance + 1);
+                Console.WriteLine("Gained Resistance ({0}%)! {1} -> {2}", GrowthResistance, BaseResistance, BaseResistance + 1);
                 BaseResistance += 1;
             }
             else if (GetRNG() <= Luck)
@@ -218,7 +254,7 @@ namespace ArenaSimulator
             }
             if (GetRNG() <= GrowthSpeed)
             {
-                Console.WriteLine("Gained Speed! {0} -> {1}", BaseSpeed, BaseSpeed + 1);
+                Console.WriteLine("Gained Speed ({0}%)! {1} -> {2}", GrowthSpeed, BaseSpeed, BaseSpeed + 1);
                 BaseSpeed += 1;
             }
             else if (GetRNG() <= Luck)
@@ -228,7 +264,7 @@ namespace ArenaSimulator
             }
             if (GetRNG() <= GrowthSkill)
             {
-                Console.WriteLine("Gained Skill! {0} -> {1}", BaseSkill, BaseSkill + 1);
+                Console.WriteLine("Gained Skill ({0}%)! {1} -> {2}", GrowthSkill, BaseSkill, BaseSkill + 1);
                 BaseSkill += 1;
             }
             else if (GetRNG() <= Luck)
@@ -238,7 +274,7 @@ namespace ArenaSimulator
             }
             if (GetRNG() <= GrowthLuck)
             {
-                Console.WriteLine("Gained Luck! {0} -> {1}", BaseLuck, BaseLuck + 1);
+                Console.WriteLine("Gained Luck ({0}%)! {1} -> {2}", GrowthLuck, BaseLuck, BaseLuck + 1);
                 BaseLuck += 1;
             }
             else if (GetRNG() <= Luck)
@@ -330,8 +366,8 @@ namespace ArenaSimulator
                     TriggerPassive(passive);
                 }
             }
-            // Calculate base hit chance (50 + speed + 1.5x Skill + 0.5x Luck)
-            int hitChance = 50 + Speed + MultiplyStat(Skill, 1.5f, true) + MultiplyStat(Luck, 0.5f, true);
+            // Final hit chance is the attack's accuracy + hit chance
+            int hitChance = attack.BaseAccuracy + CalculateBaseHitChance();
             // Get base damage of attack and either strength or magic (or whichever one our opponent is worse at if we can choose)
             bool usePhysical;
             if (attack.Physical && attack.Magical)
@@ -343,13 +379,14 @@ namespace ArenaSimulator
             {
                 usePhysical = attack.Physical;
             }
-            int baseDamage = attack.BaseDamage + (usePhysical ? Strength : Magic);
+            // Attack damage is a multiplier
+            int baseDamage = MultiplyStat((usePhysical ? Strength : Magic), attack.BaseDamage, true);
             // With our hit chance and damage we can tell the target to figure it out
-            target.IncomingAttack(Name, hitChance, baseDamage, usePhysical);
+            target.IncomingAttack(Name, hitChance, CalculateCritChance(), baseDamage, usePhysical);
         }
 
         // Incoming attack
-        public void IncomingAttack(string enemyName, int enemyHitPercent, int enemyDamage, bool physicalAttack)
+        public void IncomingAttack(string enemyName, int enemyHitChance, int enemyCritChance, int enemyDamage, bool physicalAttack)
         {
             // Check all passive rolls
             foreach (PassiveSkill passive in PassiveSkillsLearned)
@@ -360,42 +397,88 @@ namespace ArenaSimulator
                     TriggerPassive(passive);
                 }
             }
-            // Dodge chance is 1.5x Speed + Skill + 0.5x Luck;
-            int dodgeChance = MultiplyStat(Speed, 1.5f, true) + Skill + MultiplyStat(Luck, 0.5f, true);
+            int dodgeChance = CalculateDodgeChance();
+            // crit avoid is opposite of crit
+            int critAvoidChance = CalculateCritChance();
             // Roll to dodge (hit chance - dodge chance)
             // temp hit roll output
-            int rng = GetRNG();
+            int hitRNG = GetRNG();
+            // Store attack output line
+            string attackOutcome;
+            // Store damage
+            int netDamage = 0;
+            // Store chance to get hit
+            int enemyNetHitChance = enemyHitChance - dodgeChance;
             // Check if attack connects
-            if (rng <= (enemyHitPercent - dodgeChance))
+            if (hitRNG <= enemyNetHitChance)
             {
-                int netDamage;
                 int blockingStat;
-                // Check if physical
-                if (physicalAttack)
+                int critRNG = GetRNG();
+                int bonusCrit;
+                int finalCritChance;
+                // Crit chance is their base crit - our base crit + if their hit chance was over 100% add the difference
+                bonusCrit = (enemyNetHitChance > 100 ? enemyNetHitChance - 100 : 0);
+                finalCritChance = enemyCritChance - critAvoidChance + bonusCrit;
+                // Roll crit, if true then ignore defenses)
+                if (critRNG <= (finalCritChance))
                 {
-                    blockingStat = Defense;
+                    blockingStat = 0;
+                    // Crits ignore defenses they do not do additional damage on top
+                    netDamage = enemyDamage;
+                    attackOutcome = string.Format("{0} ({1}% hit)({2}% crit) attacks {3} and crits for {4} damage!", enemyName, enemyNetHitChance, finalCritChance, Name, netDamage);
                 }
-                else { blockingStat = Resistance; }
-                // Calculate net damage
-                netDamage = enemyDamage - blockingStat;
-                // Test to make sure positive damage
-                netDamage = netDamage > 0 ? netDamage : 0;
-                Console.WriteLine("{0} ({1}% hit) attacks {2} ({3}% dodge) and hits for {4} - {5} = {6} damage!", enemyName, enemyHitPercent, Name, dodgeChance, enemyDamage, blockingStat, netDamage);
-                if (HP - netDamage < 0)
+                else // regular hit
                 {
-                    Console.WriteLine("{0} is slain! Overkill: {1}", Name, HP - netDamage);
+                    // Blocking stat is Defense if attack is physical otherwise resistance
+                    blockingStat = (physicalAttack) ? Defense : Resistance;
+                    // Calculate net damage
+                    netDamage = enemyDamage - blockingStat;
+                    // Test to make sure positive damage
+                    netDamage = netDamage > 0 ? netDamage : 0;
+                    attackOutcome = string.Format("{0} ({1}% hit) attacks {2} and hits for {3} - {4} = {5} damage!", enemyName, enemyNetHitChance, Name, enemyDamage, blockingStat, netDamage);
                 }
-                else
-                {
-                    Console.WriteLine("{0} HP: {1} -> {2}", Name, HP, HP - netDamage);
-                }
-                
-                HP -= netDamage;
             }
             else
             {
-                Console.WriteLine("{0} ({1}% hit) attacks {2} ({3}% dodge) and misses!", enemyName, enemyHitPercent, Name, dodgeChance);
+                attackOutcome = string.Format("{0} ({1}% hit) attacks {2} and misses!", enemyName, enemyNetHitChance, Name, dodgeChance);
             }
+            Console.WriteLine(attackOutcome);
+            // Check if damage was dealt
+            if (netDamage > 0)
+            {
+                // Get new HP value
+                int newHP = HP - netDamage;
+                if (newHP <= 0)
+                {
+                    Console.WriteLine("{0} is slain! Overkill: {1}", Name, newHP);
+                }
+                else
+                {
+                    Console.WriteLine("{0} HP: {1}/{2} -> {3}/{2}", Name, HP, BaseHP, newHP);
+                }
+                HP = newHP;
+            }
+        }
+
+        // Calculate base hit chance
+        protected int CalculateBaseHitChance()
+        {
+            // Double of (Speed + 1.5x Skill + 0.5x Luck)
+            return 2 * (Speed + MultiplyStat(Skill, 1.5f, true) + MultiplyStat(Luck, 0.5f, true));
+        }
+
+        // Calculate base dodge chance
+        protected int CalculateDodgeChance()
+        {
+            // 1.5x Speed + Skill + 0.5x Luck
+            return MultiplyStat(Speed, 1.5f, true) + Skill + MultiplyStat(Luck, 0.5f, true);
+        }
+
+        // Calculate base crit chance
+        protected int CalculateCritChance()
+        {
+            // Skill + 0.25x Luck
+            return Skill + MultiplyStat(Luck, 0.25f, true);
         }
 
         // Trigger passive effects
@@ -415,15 +498,18 @@ namespace ArenaSimulator
                     // Effects are mostly placeholders so don't mind these
                     case PassiveSkills.BoostMagic:
                         Magic = MultiplyStat(Magic, 1.2f, true);
+                        Resistance = MultiplyStat(Resistance, 1.2f, true);
                         break;
                     case PassiveSkills.BoostStrength:
                         Strength = MultiplyStat(Strength, 1.2f, true);
+                        Defense = MultiplyStat(Defense, 1.2f, true);
                         break;
                     case PassiveSkills.ProtectAll:
                         // TODO set up buffs / debuffs and add immunity as a buff
                         break;
                     case PassiveSkills.Sacrifice:
                         HP = MultiplyStat(HP, 0.8f, false);
+                        if (HP <= 0) { HP = 1; }
                         Strength = MultiplyStat(Strength, 1.1f, true);
                         Magic = MultiplyStat(Magic, 1.1f, true);
                         Defense = MultiplyStat(Defense, 1.1f, true);
@@ -431,6 +517,17 @@ namespace ArenaSimulator
                         Speed = MultiplyStat(Speed, 1.1f, true);
                         Skill = MultiplyStat(Skill, 1.1f, true);
                         Luck = MultiplyStat(Luck, 1.1f, true);
+                        break;
+                    case PassiveSkills.BoostSkill:
+                        Skill = MultiplyStat(Skill, 1.2f, true);
+                        Speed = MultiplyStat(Speed, 1.2f, true);
+                        break;
+                    case PassiveSkills.Cleanse:
+                        // TODO buffs/debuffs
+                        break;
+                    case PassiveSkills.ReactiveLuck:
+                        HP += MultiplyStat(BaseHP, 0.2f, true);
+                        Luck = MultiplyStat(Luck, 1.2f, true);
                         break;
                 }
             }
