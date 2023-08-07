@@ -94,30 +94,11 @@ namespace ArenaSimulator
         // Default growths
         protected virtual void InitializeGrowths(int defaultGrowth = 10)
         {
-            // Fill with default growths (messing around with random scaling for testing)
-            // Initial rolls are between 1x and 9x
-            // Bad luck protection (every time RNG.Next rolls below 3 its minimum goes up by 1 until it reaches 3)
-            int currentMin = 1;
-            // Good luck punishment (every time RNG.Next rolls 7+ its maximum goes down by 1 until it reaches 7)
-            int currentMax = 10;
+            // Fill with default growths (messing around with stat growth array for testing)
+            // Everyone has a template of [1, 2, 3, 4, 5, 6, 7, 8] as stat multipliers and they are distributed randomly
+            List<int> jumbledMultiplier = new List<int> { 1, 2, 3, 4, 5, 6, 7, 8 };
             // Final multipliers
             int[] statMultiplier = new int [8];
-            // Multpliers that we will pull from
-            List<int> jumbledMultiplier = new List<int>();
-            for (int i = 0; i < 8; i++)
-            {
-                // Give roll to list
-                jumbledMultiplier.Add(RNG.Next(currentMin, currentMax));
-                // We will automatically stop adding to the minimum when it is 3 and subtracting from max when it is 8 (7 inclusive)
-                if (jumbledMultiplier[i] < 3)
-                {
-                    currentMin += 1;
-                }
-                else if (jumbledMultiplier[i] > 8)
-                {
-                    currentMax -= 1;
-                }
-            }
             // Pull randomly from multipliers to fill stat multiplier list
             int nextIndex;
             for (int i = 0; i < statMultiplier.Length; i++)
@@ -127,7 +108,7 @@ namespace ArenaSimulator
                 // Add index to stat multiplier
                 statMultiplier[i] = jumbledMultiplier[nextIndex];
                 // Remove eligible index
-                jumbledMultiplier.Remove(nextIndex);
+                jumbledMultiplier.RemoveAt(nextIndex);
             }
             // Apply multipliers
             GrowthHP = defaultGrowth * statMultiplier[0];
@@ -136,8 +117,8 @@ namespace ArenaSimulator
             GrowthMagic = defaultGrowth * statMultiplier[3];
             GrowthResistance = defaultGrowth * statMultiplier[4];
             GrowthSpeed = defaultGrowth * statMultiplier[5];
-            GrowthSkill = defaultGrowth * statMultiplier[0];
-            GrowthLuck = defaultGrowth * RNG.Next(1, 10);
+            GrowthSkill = defaultGrowth * statMultiplier[6];
+            GrowthLuck = defaultGrowth * statMultiplier[7];
         }
 
         // Reset current stats to base values
