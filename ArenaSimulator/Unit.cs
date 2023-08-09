@@ -72,9 +72,15 @@ namespace ArenaSimulator
             InitializeGrowths();
             // Level up once
             LevelUp();
-            // Get basic autoattacks
-            AddActiveSkill(ActiveSkills.BasicMelee);
-            AddActiveSkill(ActiveSkills.BasicMagic);
+            // Get basic autoattack based on higher stat
+            if (Strength > Magic)
+            {
+                AddActiveSkill(ActiveSkills.BasicMelee);
+            }
+            else
+            {
+                AddActiveSkill(ActiveSkills.BasicMagic);
+            }
         }
 
         // In case we want custom base stats later
@@ -98,7 +104,7 @@ namespace ArenaSimulator
             // Everyone has a template of [1, 2, 3, 4, 5, 6, 7, 8] as stat multipliers and they are distributed randomly
             List<int> jumbledMultiplier = new List<int> { 1, 2, 3, 4, 5, 6, 7, 8 };
             // Final multipliers
-            int[] statMultiplier = new int [8];
+            int[] statMultiplier = new int[8];
             // Pull randomly from multipliers to fill stat multiplier list
             int nextIndex;
             for (int i = 0; i < statMultiplier.Length; i++)
@@ -335,8 +341,85 @@ namespace ArenaSimulator
             }
         }
 
-        // Outgoing attack
-        public void OutgoingAttack(ActiveSkill attack, Unit target)
+        // Update info on turn start TODO handle buffs debuffs
+        public void NextTurn()
+        {
+            ReduceAllCooldowns();
+        }
+
+        // Reduce all cooldowns by 1
+        protected void ReduceAllCooldowns()
+        {
+            // Update active skill cooldowns
+            foreach (ActiveSkill active in ActiveSkillsLearned)
+            {
+                // Subtract one from skill cooldown
+                active.TurnCooldownUpdate();
+            }
+            // Update passive skill cooldowns
+            foreach (PassiveSkill passive in PassiveSkillsLearned)
+            {
+                // Subtract one from skill cooldown
+                passive.TurnCooldownUpdate();
+            }
+        }
+
+        // Check cooldowns and if situational active skills are eligible to be used
+        protected bool CheckActiveEligiblity(ActiveSkill skill)
+        {
+            // immediately leave if the ability is not ready
+            if (!skill.SkillReady())
+            {
+                return false;
+            }
+
+            switch (skill.InternalName)
+            {
+                // Only cast hasten if at least one active skill is on cooldown
+                case (ActiveSkills.Hasten):
+                    foreach (ActiveSkill checkSkill in ActiveSkillsLearned)
+                    {
+                        if (!checkSkill.SkillReady())
+                        {
+                            return true;
+                        }
+                    }
+                    return false;
+                // TODO make purify useful
+                case (ActiveSkills.Purify):
+                    return false;
+                default:
+                    return true;
+            }
+        }
+
+        // Get next attack
+        public ActiveSkill GetNextAttack()
+        {
+            /* Example: active skills list cooldowns are [0, 0, 1, 3, 0]
+             * attackIndices list will look like [0, 1, 4] corresponding to 1st, 2nd and 5th attacks which have no cooldown
+             * We pick a random one of those three, for instance '1', then send that back into the original list so it picks the 2nd attack
+             */
+
+            // List of eligible attack indices
+            List<int> attackIndices = new List<int>();
+            for (int i = 0; i < ActiveSkillsLearned.Count; i++)
+            {
+                // Add any available abilities to list (and do not waste situational abilities)
+                if (CheckActiveEligiblity(ActiveSkillsLearned[i]))
+                {
+                    attackIndices.Add(i);
+                }
+            }
+            // Pick random eligible index
+            int chosenIndex = attackIndices[RNG.Next(0, attackIndices.Count)];
+            // Update cooldown of picked ability
+            ActiveSkillsLearned[chosenIndex].UseSkill();
+            return ActiveSkillsLearned[chosenIndex];
+        }
+
+        // Initial attack logic
+        public void InitialAttack(ActiveSkill attack, Unit target)
         {
             // Check all passive rolls
             foreach (PassiveSkill passive in PassiveSkillsLearned)
@@ -347,27 +430,51 @@ namespace ArenaSimulator
                     TriggerPassive(passive);
                 }
             }
+            // Additional logic for some abilities
+            switch (attack.InternalName)
+            {
+                // These abilities attack twice
+                case (ActiveSkills.DoubleMagic):
+                    OutgoingAttack(attack, target);
+                    OutgoingAttack(attack, target);
+                    break;
+                case (ActiveSkills.DoubleMelee):
+                    OutgoingAttack(attack, target);
+                    OutgoingAttack(attack, target);
+                    break;
+                case (ActiveSkills.Hasten):
+                    Console.WriteLine("{0} casts Hasten!", Name);
+                    // Increase our speed
+                    MultiplyStat(Speed, 1.2f, true);
+                    // Reduce all of our cooldowns
+                    ReduceAllCooldowns();
+                    break;
+                case (ActiveSkills.Purify):
+                    Console.WriteLine("{0} casts Purify!", Name);
+                    // TODO handle debuffs
+                    break;
+                default:
+                    // Default is to just attack once with the stated ability
+                    OutgoingAttack(attack, target);
+                    break;
+            }
+        }
+
+        // Offensive outgoing attack with actual damage calculations
+        protected void OutgoingAttack(ActiveSkill attack, Unit target)
+        {
             // Final hit chance is the attack's accuracy + hit chance
             int hitChance = attack.BaseAccuracy + CalculateBaseHitChance();
-            // Get base damage of attack and either strength or magic (or whichever one our opponent is worse at if we can choose)
-            bool usePhysical;
-            if (attack.Physical && attack.Magical)
-            {
-                // Invert high defense
-                usePhysical = !HighDefense();
-            }
-            else
-            {
-                usePhysical = attack.Physical;
-            }
+            // Get base damage of attack and either strength or magic
+            int attackScaling = (attack.StrengthScaling) ? Strength : Magic;
             // Attack damage is a multiplier
-            int baseDamage = MultiplyStat((usePhysical ? Strength : Magic), attack.BaseDamage, true);
+            int baseDamage = MultiplyStat(attackScaling, attack.BaseDamage, true);
             // With our hit chance and damage we can tell the target to figure it out
-            target.IncomingAttack(Name, hitChance, CalculateCritChance(), baseDamage, usePhysical);
+            target.IncomingAttack(Name, attack.ToString(), hitChance, CalculateCritChance(), baseDamage, attack.DefenseResist);
         }
 
         // Incoming attack
-        public void IncomingAttack(string enemyName, int enemyHitChance, int enemyCritChance, int enemyDamage, bool physicalAttack)
+        public void IncomingAttack(string enemyName, string enemyAttackName, int enemyHitChance, int enemyCritChance, int enemyDamage, bool defenseRes)
         {
             // Check all passive rolls
             foreach (PassiveSkill passive in PassiveSkillsLearned)
@@ -388,6 +495,8 @@ namespace ArenaSimulator
             int netDamage = 0;
             // Store chance to get hit
             int enemyNetHitChance = enemyHitChance - dodgeChance;
+            // Make sure enemy hit chance cannot go below 0%
+            enemyHitChance = enemyHitChance < 0 ? 0 : enemyHitChance;
             // temp hit roll output
             int hitRNG = GetRNG();
             // if enemy hit chance is >50%, then average two RNG rolls instead (helps when more accurate)
@@ -408,22 +517,24 @@ namespace ArenaSimulator
                     blockingStat = 0;
                     // Crits ignore defenses they do not do additional damage on top
                     netDamage = enemyDamage;
-                    attackOutcome = string.Format("{0} ({1}% hit)({2}% crit) attacks {3} and crits for {4} damage!", enemyName, enemyNetHitChance, finalCritChance, Name, netDamage);
+                    attackOutcome = string.Format("{0} ({1}% hit)({2}% crit) uses {3} to attack {4} and crits for {5} damage!",
+                        enemyName, enemyNetHitChance, finalCritChance, enemyAttackName, Name, netDamage);
                 }
                 else // regular hit
                 {
-                    // Blocking stat is Defense if attack is physical otherwise resistance
-                    blockingStat = (physicalAttack) ? Defense : Resistance;
+                    // Blocking stat is Defense if attack uses defense stat otherwise resistance
+                    blockingStat = (defenseRes) ? Defense : Resistance;
                     // Calculate net damage
                     netDamage = enemyDamage - blockingStat;
                     // Test to make sure positive damage
                     netDamage = netDamage > 0 ? netDamage : 0;
-                    attackOutcome = string.Format("{0} ({1}% hit) attacks {2} and hits for {3} - {4} = {5} damage!", enemyName, enemyNetHitChance, Name, enemyDamage, blockingStat, netDamage);
+                    attackOutcome = string.Format("{0} ({1}% hit) uses {2} to attack {3} and hits for {4} - {5} = {6} damage!",
+                        enemyName, enemyNetHitChance, enemyAttackName, Name, enemyDamage, blockingStat, netDamage);
                 }
             }
             else
             {
-                attackOutcome = string.Format("{0} ({1}% hit) attacks {2} and misses!", enemyName, enemyNetHitChance, Name, dodgeChance);
+                attackOutcome = string.Format("{0} ({1}% hit) uses {2} to attack {3} and misses!", enemyName, enemyNetHitChance, enemyAttackName, Name, dodgeChance);
             }
             Console.WriteLine(attackOutcome);
             // Check if damage was dealt
@@ -460,8 +571,8 @@ namespace ArenaSimulator
         // Calculate base crit chance
         protected int CalculateCritChance()
         {
-            // Skill + 0.25x Luck
-            return Skill + MultiplyStat(Luck, 0.25f, true);
+            // Skill + 0.5x Luck
+            return Skill + MultiplyStat(Luck, 0.5f, true);
         }
 
         // Trigger passive effects
@@ -474,7 +585,10 @@ namespace ArenaSimulator
             if (GetRNG() <= procChance)
             {
                 // Put the skill on cooldown
-                passiveSkill.UseSkill(Name);
+                passiveSkill.UseSkill();
+                // Log that we have triggered the skill
+                string offensiveString = (passiveSkill.Offensive) ? "offensively procs" : "defensively procs";
+                Console.WriteLine("{0} {1} {2}!", Name, offensiveString, passiveSkill.ToString());
                 // Look up based on internal name
                 switch (passiveSkill.InternalName)
                 {
@@ -547,7 +661,5 @@ namespace ArenaSimulator
             return (1f + Luck / 100f);
         }
 
-        // TODO add "recieve damage" (check passives for on-damage-taken as a step) and "deal damage" (check passives for damage-dealt as a step)
-        // and "try attack" vs "recieve attack" for when attacking or attacked
     }
 }

@@ -16,6 +16,8 @@ namespace ArenaSimulator
             int speedTest = red.Speed - blue.Speed;
             // Tiebreaker is skill stat then RNG
             bool redTurn = false;
+            // Turn counter
+            int turn = 0;
             // Check they are both alive
             while (red.IsAlive() && blue.IsAlive())
             {
@@ -39,12 +41,17 @@ namespace ArenaSimulator
                         redTurn = RNG.Next(0,2) == 0;
                     }
                 }
+                turn += 1;
                 // Do turns
                 if (redTurn)
                 {
                     if (red.IsAlive())
                     {
-                        red.OutgoingAttack(red.ActiveSkillsLearned[0], blue);
+                        Console.WriteLine("Turn {0}: {1}", turn, red.Name);
+                        // Reduces cooldowns
+                        red.NextTurn();
+                        // Attacks with a randomly available attack
+                        red.InitialAttack(red.GetNextAttack(), blue);
                         speedTest -= blue.Speed;
                     }
                 }
@@ -52,7 +59,9 @@ namespace ArenaSimulator
                 {
                     if (blue.IsAlive())
                     {
-                        blue.OutgoingAttack(blue.ActiveSkillsLearned[0], red);
+                        Console.WriteLine("Turn {0}: {1}", turn, blue.Name);
+                        blue.NextTurn();
+                        blue.InitialAttack(blue.GetNextAttack(), red);
                         speedTest += red.Speed;
                     }
                 }

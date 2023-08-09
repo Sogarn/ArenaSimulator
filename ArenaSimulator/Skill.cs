@@ -15,10 +15,26 @@ namespace ArenaSimulator
         // Turns between uses
         protected int Cooldown { get; set; }
         protected int RemainingCooldown { get; set; }
-        // Physical damage type
-        public bool Physical { get; protected set; }
-        // Magical damage type
-        public bool Magical { get; protected set; }
+        // Damage scaling Physical
+        public bool StrengthScaling { get; protected set; }
+        // Damage scaling Magical
+        public bool MagicScaling { get; protected set; }
+        // Attacks vs defense
+        public bool DefenseResist { get; protected set; }
+        // Attacks vs resistance
+        public bool ResistanceResist { get; protected set; }
+
+        // Default constructor
+        public Skill()
+        {
+            // Set all damage types to false so that we can just flag trues
+            StrengthScaling = false;
+            MagicScaling = false;
+            DefenseResist = false;
+            ResistanceResist = false;
+            // Remaining cooldown always starts at 0
+            RemainingCooldown = 0;
+        }
 
         // Check cooldown
         public bool SkillReady()
@@ -26,11 +42,17 @@ namespace ArenaSimulator
             return (RemainingCooldown == 0);
         }
 
-        // Use skill (plus some logging)
-        public void UseSkill(string unitName)
+        // Use skill
+        public virtual void UseSkill()
         {
-            Console.WriteLine("{0} activates {1}!", unitName, Name);
             RemainingCooldown = Cooldown;
+        }
+
+        // Reduce skill cooldowns by one
+        public void TurnCooldownUpdate()
+        {
+            // Lower remaining cooldown by 1 if possible
+            RemainingCooldown = (RemainingCooldown > 0 ? RemainingCooldown - 1 : 0);
         }
 
         // Reset cooldowns
@@ -54,6 +76,7 @@ namespace ArenaSimulator
         {
             return Name;
         }
+
     }
 
     // Active skills can be chosen on a given turn
@@ -63,7 +86,7 @@ namespace ArenaSimulator
         public ActiveSkills InternalName { get; protected set; }
         // Damage it deals as a multiplier
         public float BaseDamage { get; protected set; }
-        // Base accuracy is added to unit accuracy and ranges from -50% to +50%
+        // Base accuracy is added to unit accuracy and ranges from +0% to +50%
         public int BaseAccuracy { get; protected set; }
 
         // Will have custom constructor for every ID enum above
@@ -78,20 +101,18 @@ namespace ArenaSimulator
                     BaseDamage = 1f;
                     BaseAccuracy = 0;
                     Cooldown = 0;
-                    RemainingCooldown = Cooldown;
-                    Physical = true;
-                    Magical = false;
+                    StrengthScaling = true;
+                    DefenseResist = true;
                     break;
                 // Stronger melee attack
                 case ActiveSkills.StrongMelee:
                     InternalName = ActiveSkills.StrongMelee;
                     Name = "Overpower";
-                    BaseDamage = 1.5f;
-                    BaseAccuracy = 25;
-                    Cooldown = 3;
-                    RemainingCooldown = Cooldown;
-                    Physical = true;
-                    Magical = false;
+                    BaseDamage = 2f;
+                    BaseAccuracy = 50;
+                    Cooldown = 4;
+                    StrengthScaling = true;
+                    DefenseResist = true;
                     break;
                 // Magic auto attack
                 case ActiveSkills.BasicMagic:
@@ -100,91 +121,80 @@ namespace ArenaSimulator
                     BaseDamage = 1f;
                     BaseAccuracy = 0;
                     Cooldown = 0;
-                    RemainingCooldown = Cooldown;
-                    Physical = false;
-                    Magical = true;
+                    MagicScaling = true;
+                    ResistanceResist = true;
                     break;
                 // Stronger magic attack
                 case ActiveSkills.StrongMagic:
                     InternalName = ActiveSkills.StrongMagic;
                     Name = "Arcane Blast";
-                    BaseDamage = 1.5f;
-                    BaseAccuracy = 25;
-                    Cooldown = 3;
-                    RemainingCooldown = Cooldown;
-                    Physical = false;
-                    Magical = true;
+                    BaseDamage = 2f;
+                    BaseAccuracy = 50;
+                    Cooldown = 4;
+                    MagicScaling = true;
+                    ResistanceResist = true;
                     break;
                 // // Melee twice at an accuracy penalty
                 case ActiveSkills.DoubleMelee:
                     InternalName = ActiveSkills.DoubleMelee;
                     Name = "Dual strike";
                     BaseDamage = 0.9f;
-                    BaseAccuracy = -25;
+                    BaseAccuracy = 0;
                     Cooldown = 2;
-                    RemainingCooldown = Cooldown;
-                    Physical = false;
-                    Magical = true;
+                    StrengthScaling = true;
+                    DefenseResist = true;
                     break;
                 // Magic twice at an accuracy penalty
                 case ActiveSkills.DoubleMagic:
                     InternalName = ActiveSkills.DoubleMagic;
-                    Name = "Doublecast";
-                    BaseDamage = .9f;
-                    BaseAccuracy = -25;
+                    Name = "Twincast";
+                    BaseDamage = 0.9f;
+                    BaseAccuracy = 0;
                     Cooldown = 2;
-                    RemainingCooldown = Cooldown;
-                    Physical = false;
-                    Magical = true;
+                    MagicScaling = true;
+                    ResistanceResist = true;
                     break;
-                // Magic that gives burning debuff
+                // Magic that gives burning debuff (repeat net damage for 2 turns)
                 case ActiveSkills.MagicBurning:
                     InternalName = ActiveSkills.MagicBurning;
                     Name = "Fireball";
-                    BaseDamage = 1.2f;
+                    BaseDamage = 1.1f;
                     BaseAccuracy = 25;
                     Cooldown = 3;
-                    RemainingCooldown = Cooldown;
-                    Physical = false;
-                    Magical = true;
+                    MagicScaling = true;
+                    ResistanceResist = true;
                     break;
-                // Magic that gives poison debuff
+                // Magic that gives poison debuff (deal its base damage ignoring defenses for 4 turns)
                 case ActiveSkills.MagicPoison:
                     InternalName = ActiveSkills.MagicPoison;
                     Name = "Noxious Fumes";
-                    BaseDamage = 0.2f;
+                    BaseDamage = 0.5f;
                     BaseAccuracy = 25;
                     Cooldown = 3;
-                    RemainingCooldown = Cooldown;
-                    Physical = false;
-                    Magical = true;
+                    MagicScaling = true;
+                    ResistanceResist = true;
                     break;
-                // Melee that gives bleed debuff
+                // Melee that gives bleed debuff (deal its base damage ignoring defenses for 4 turns)
                 case ActiveSkills.MeleeBleeding:
                     InternalName = ActiveSkills.StrongMagic;
                     Name = "Rupture";
-                    BaseDamage = 0.2f;
+                    BaseDamage = 0.5f;
                     BaseAccuracy = 25;
                     Cooldown = 3;
-                    RemainingCooldown = Cooldown;
-                    Physical = false;
-                    Magical = true;
+                    StrengthScaling = true;
+                    DefenseResist = true;
                     break;
                 // Reduce all other cooldowns and increase speed
                 case ActiveSkills.Hasten:
                     InternalName = ActiveSkills.Hasten;
                     Name = "Hasten";
                     Cooldown = 5;
-                    RemainingCooldown = Cooldown;
-                    Magical = true;
                     break;
                 // Remove all debuffs
                 case ActiveSkills.Purify:
                     InternalName = ActiveSkills.Purify;
                     Name = "Purify";
                     Cooldown = 3;
-                    RemainingCooldown = Cooldown;
-                    Magical = true;
                     break;
                 default:
                     break;
@@ -211,75 +221,61 @@ namespace ArenaSimulator
             switch (skill)
             {
                 // Note Defensive is set automatically as the opposite of Offensive later on
-                // Boost strength and defense no cooldown
+                // Boost strength and defense low cooldown
                 case PassiveSkills.BoostStrength:
                     InternalName = PassiveSkills.BoostStrength;
                     Name = "Bolster";
-                    Cooldown = 0;
+                    Cooldown = 2;
                     Offensive = true;
-                    SkillCoefficient = 1f;
-                    Physical = true;
-                    Magical = false;
+                    SkillCoefficient = 1.5f;
                     break;
-                // Boost magic and res no cooldown
+                // Boost magic and res low cooldown
                 case PassiveSkills.BoostMagic:
                     InternalName = PassiveSkills.BoostMagic;
                     Name = "Incanter's Flow";
-                    Cooldown = 0;
+                    Cooldown = 2;
                     Offensive = true;
                     SkillCoefficient = 1f;
-                    Physical = true;
-                    Magical = false;
                     break;
                 // Gain immunity from next damage source
                 case PassiveSkills.ProtectAll:
                     InternalName = PassiveSkills.ProtectAll;
                     Name = "Deflect";
-                    Cooldown = 1;
+                    Cooldown = 3;
                     Offensive = false;
                     SkillCoefficient = 0.5f;
-                    Physical = true;
-                    Magical = true;
                     break;
                 // Sacrifice boosts all stats at the cost of health
                 case PassiveSkills.Sacrifice:
                     InternalName = PassiveSkills.Sacrifice;
                     Name = "Dark Pact";
-                    Cooldown = 0;
+                    Cooldown = 2;
                     Offensive = true;
-                    SkillCoefficient = 1f;
-                    Physical = true;
-                    Magical = true;
+                    SkillCoefficient = 0.75f;
                     break;
-                // Boost skill and speed no cooldown
+                // Boost skill and speed low cooldown
                 case PassiveSkills.BoostSkill:
                     InternalName = PassiveSkills.BoostSkill;
                     Name = "The Thrill";
-                    Cooldown = 0;
+                    Cooldown = 2;
                     Offensive = true;
                     SkillCoefficient = 0.5f;
-                    Physical = true;
-                    Magical = true;
                     break;
-                // Chance to cure highest damaging debuff on attack short cooldown
+                // Chance to cure highest damaging debuff on attack
                 case PassiveSkills.Cleanse:
                     InternalName = PassiveSkills.Cleanse;
                     Name = "Cleanse";
-                    Cooldown = 1;
+                    Cooldown = 3;
                     Offensive = true;
-                    SkillCoefficient = 0.5f;
-                    Physical = true;
-                    Magical = true;
+                    SkillCoefficient = 1f;
                     break;
                 // Boost HP and Luck
                 case PassiveSkills.ReactiveLuck:
                     InternalName = PassiveSkills.ReactiveLuck;
                     Name = "Divine Favor";
-                    Cooldown = 1;
+                    Cooldown = 3;
                     Offensive = false;
                     SkillCoefficient = 1f;
-                    Physical = true;
-                    Magical = true;
                     break;
             }
             // Always set RemainingCooldown to 0 to start
