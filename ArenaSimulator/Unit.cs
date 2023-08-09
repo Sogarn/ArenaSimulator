@@ -161,19 +161,19 @@ namespace ArenaSimulator
         {
             Console.WriteLine("{0} leveled up! Level {1} -> {2}", Name, Level, Level + 1);
             Level += 1;
-            // If our level is divisible by 5 then gain an active and passive skill slot
-            if (Level % 5 == 0)
+            // If our level is divisible by 4 then gain an active and passive skill slot
+            if (Level % 4 == 0)
             {
                 MaxActiveSkills += 1;
                 MaxPassiveSkills += 1;
             }
-            // If our level is divisible by 3 then learn a random active skill
-            if (Level % 3 == 0)
+            // If our level is divisible by 2 then learn a random active skill
+            if (Level % 2 == 0)
             {
                 LearnRandomActiveSkill();
             }
-            // If our level is divisible by 4 then learn a random passive skill
-            if (Level % 4 == 0)
+            // If our level is divisible by 3 then learn a random passive skill
+            if (Level % 3 == 0)
             {
                 LearnRandomPassiveSkill();
             }
@@ -382,14 +382,16 @@ namespace ArenaSimulator
             // crit avoid is opposite of crit
             int critAvoidChance = CalculateCritChance();
             // Roll to dodge (hit chance - dodge chance)
-            // temp hit roll output
-            int hitRNG = GetRNG();
             // Store attack output line
             string attackOutcome;
             // Store damage
             int netDamage = 0;
             // Store chance to get hit
             int enemyNetHitChance = enemyHitChance - dodgeChance;
+            // temp hit roll output
+            int hitRNG = GetRNG();
+            // if enemy hit chance is >50%, then average two RNG rolls instead (helps when more accurate)
+            hitRNG = enemyNetHitChance > 50 ? ((hitRNG + GetRNG()) / 2) : hitRNG;
             // Check if attack connects
             if (hitRNG <= enemyNetHitChance)
             {
